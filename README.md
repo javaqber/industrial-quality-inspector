@@ -4,7 +4,7 @@ Este proyecto es un sistema de **Visión Artificial end-to-end** para el control
 
 Todo el entorno está contenerizado con **Docker**, asegurando un despliegue ligero (CPU-only) y reproducible en cualquier servidor de planta.
 
-![Logo del Proyecto](assets/logo.png)
+![Logo del Proyecto](assets/logo_IndustrialQI.png)
 
 ## 🏗️ Arquitectura
 

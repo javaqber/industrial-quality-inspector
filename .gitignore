@@ -1,0 +1,20 @@
+# --- Ignorar carpetas pesadas de datos ---
+datasets/
+raw_data/
+
+# --- Ignorar entorno virtual y cachés ---
+venv/
+__pycache__/
+.pytest_cache/
+
+# --- Ignorar archivos de sistema o IDE ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Ignorar salidas de entrenamiento pesadas ---
+# La carpeta 'runs' tiene muchos logs. 
+# Lo ideal es sacar el archivo 'best.pt' fuera si quieres guardarlo,
+# pero no subir todos los gráficos intermedios si pesan mucho.
+runs/detect/
+runs/classify/*/train/weights/last.pt

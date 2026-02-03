@@ -5,7 +5,20 @@ from ultralytics import YOLO
 
 app = FastAPI(
     title="Industrial Quality Inspector - Aluminium Edition",
-    description="API de IA para detección de defectos en extrusión de aluminio.",
+    description="""
+    ## 🏭 Sistema de Inspección de Calidad con IA
+    
+    Esta API utiliza un modelo **YOLOv8** entrenado específicamente para detectar defectos en la extrusión de aluminio.
+    
+    ### 🚀 CÓMO USAR ESTA PÁGINA:
+    
+    1. Busca abajo el recuadro verde que dice **POST /predict**.
+    2. Haz clic en la flecha de la derecha para desplegarlo.
+    3. Pulsa el botón gris **Try it out** (arriba a la derecha del recuadro).
+    4. En el campo **file**, pulsa el botón para **Elegir archivo** y sube tu foto del perfil de aluminio.
+    5. Dale al botón azul gigante **Execute**.
+    6. ¡Baja un poco y mira la respuesta en **Server response**!
+    """,
     version="2.0.0",
     contact={
         "name": "Javier Vaquero - AI Engineer",

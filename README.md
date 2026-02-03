@@ -4,8 +4,7 @@ Este proyecto es un sistema de **Visión Artificial end-to-end** para el control
 
 Todo el entorno está contenerizado con **Docker**, asegurando un despliegue ligero (CPU-only) y reproducible en cualquier servidor de planta.
 
-![Industrial Quality Inspector Logo](path/to/your/logo.png)
-_(Asegúrate de subir el logo que te he pasado y poner aquí la ruta correcta, ej: assets/logo.png)_
+![Logo del Proyecto](assets/logo.png)
 
 ## 🏗️ Arquitectura
 
@@ -40,7 +39,7 @@ El sistema consta de un flujo de trabajo optimizado para inferencia en producci�
 1.  Clonar el repositorio:
 
     ```bash
-    git clone [https://github.com/TU_USUARIO/industrial_quality_inspector.git](https://github.com/TU_USUARIO/industrial_quality_inspector.git)
+    git clone https://github.com/javaqber/industrial-quality-inspector.git
     cd industrial_quality_inspector
     ```
 

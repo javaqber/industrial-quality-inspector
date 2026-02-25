@@ -66,9 +66,6 @@ El sistema consta de un flujo de trabajo optimizado para inferencia en producci�
 
 El sistema está diseñado para recibir una imagen cruda y devolver una decisión accionable en milisegundos.
 
-**Input (Imagen de ejemplo):**
-_(Puedes poner aquí una imagen pequeña de un defecto de ejemplo)_
-
 **Output (Respuesta JSON de la API):**
 
 ```json

@@ -120,48 +120,71 @@ if uploaded_file is not None:
 
     # Botón de Inferencia
     if st.button("🔍 Iniciar Análisis con IA"):
-        with st.spinner("🧠 Procesando imagen con YOLOv8..."):
+        with st.spinner("🧠 Procesando imagen con YOLOv8... (puede tardar si el servidor está despertando)"):
             img_bytes = uploaded_file.getvalue()
-            files = {"file": (uploaded_file.name, img_bytes,
-                              uploaded_file.type)}
 
-            # CORRECCIÓN 2: Añadimos el carnet de identidad a la petición principal de análisis
             headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
 
-            try:
-                # CORRECCIÓN 3: Pasamos el 'headers_analysis' en el POST
-                response = requests.post(
-                    f"{API_URL}/predict", files=files, headers=headers_analysis)
+            # --- LÓGICA DE REINTENTOS ---
+            max_intentos = 3
+            exito = False
 
-                if response.status_code == 200:
-                    data = response.json()
+            import time
 
-                    # Mostrar Resultados
-                    if data["is_defective"]:
-                        st.markdown(f"""
-                        <div class="result-box defect">
-                            <h2 style="color: #a8071a;">❌ DEFECTO DETECTADO</h2>
-                            <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
-                            <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
-                            <hr>
-                            <h3 style="color: #a8071a;">ACCIÓN: {data['action_required']}</h3>
-                        </div>
-                        """, unsafe_allow_html=True)
+            for intento in range(max_intentos):
+                try:
+                    # Preparamos el archivo en cada intento por si se consume
+                    files = {"file": (uploaded_file.name,
+                                      img_bytes, uploaded_file.type)}
+
+                    response = requests.post(
+                        f"{API_URL}/predict", files=files, headers=headers_analysis)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        exito = True
+
+                        # Mostrar Resultados
+                        if data["is_defective"]:
+                            st.markdown(f"""
+                            <div class="result-box defect">
+                                <h2 style="color: #a8071a;">❌ DEFECTO DETECTADO</h2>
+                                <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
+                                <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
+                                <hr>
+                                <h3 style="color: #a8071a;">ACCIÓN: {data['action_required']}</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                            <div class="result-box ok">
+                                <h2 style="color: #237804;">✅ PIEZA APROBADA</h2>
+                                <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
+                                <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
+                                <hr>
+                                <h3 style="color: #237804;">ACCIÓN: {data['action_required']}</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        break  # Si sale bien, salimos del bucle de reintentos
+
+                    elif response.status_code == 429:
+                        # Si es el último intento, mostramos error. Si no, esperamos 5 segundos
+                        if intento < max_intentos - 1:
+                            # Espera 5 segundos antes de reintentar
+                            time.sleep(5)
+                            continue
+                        else:
+                            st.error(
+                                "⚠️ El servidor de Inteligencia Artificial sigue arrancando. Por favor, espera 1 minuto y vuelve a darle al botón.")
                     else:
-                        st.markdown(f"""
-                        <div class="result-box ok">
-                            <h2 style="color: #237804;">✅ PIEZA APROBADA</h2>
-                            <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
-                            <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
-                            <hr>
-                            <h3 style="color: #237804;">ACCIÓN: {data['action_required']}</h3>
-                        </div>
-                        """, unsafe_allow_html=True)
-                elif response.status_code == 429:
-                    st.error(
-                        "Error 429: El servidor está bloqueando las peticiones por seguridad. Revisa la consola de Render.")
-                else:
-                    st.error(f"Error del servidor: {response.status_code}")
+                        st.error(f"Error del servidor: {response.status_code}")
+                        # Con errores distintos a 429 no reintentamos
+                        break
 
-            except Exception as e:
-                st.error(f"Error de conexión con la API: {e}")
+                except Exception as e:
+                    if intento < max_intentos - 1:
+                        time.sleep(5)
+                        continue
+                    else:
+                        st.error(
+                            f"Error de conexión con la API tras varios intentos: {e}")

@@ -121,7 +121,7 @@ if uploaded_file is not None:
    # Botón de Inferencia
     if st.button("🔍 Iniciar Análisis con IA"):
         # Actualizamos el mensaje para que el usuario no se asuste si tarda
-        with st.spinner("🧠 Despertando servidores y procesando imagen (la primera vez puede tardar hasta 1 minuto)..."):
+        with st.spinner("🧠 Procesando imagen con YOLOv8...(la primera vez puede tardar hasta 1 minuto)"):
             img_bytes = uploaded_file.getvalue()
 
             headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
@@ -169,7 +169,7 @@ if uploaded_file is not None:
                     # Atrapamos tanto el 429 (Bloqueo) como el 503/502 (Arrancando)
                     elif response.status_code in [429, 502, 503]:
                         if intento < max_intentos - 1:
-                            # Esperamos 15 segundos y volvemos a golpear la puerta
+                            # Esperamos 15 segundos antes de volver a llamar
                             time.sleep(15)
                             continue
                         else:

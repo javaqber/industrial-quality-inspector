@@ -14,7 +14,7 @@ def despertar_api():
     try:
         # Añadido el carnet de identidad para evitar bloqueos
         headers = {"User-Agent": "IQI-Dashboard/1.0"}
-        # CORRECCIÓN 1: Aquí enviamos el 'headers' en la petición
+        # Aquí enviamos el 'headers' en la petición
         requests.get(
             "https://industrial-quality-inspector.onrender.com/docs", headers=headers, timeout=60)
         return True
@@ -118,33 +118,32 @@ if uploaded_file is not None:
     with col_img2:
         st.image(image, caption="Muestra a analizar", use_container_width=True)
 
-    # Botón de Inferencia
+   # Botón de Inferencia
     if st.button("🔍 Iniciar Análisis con IA"):
-        with st.spinner("🧠 Procesando imagen con YOLOv8... (puede tardar si el servidor está despertando)"):
+        # Actualizamos el mensaje para que el usuario no se asuste si tarda
+        with st.spinner("🧠 Despertando servidores y procesando imagen (la primera vez puede tardar hasta 1 minuto)..."):
             img_bytes = uploaded_file.getvalue()
 
             headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
 
-            # --- LÓGICA DE REINTENTOS ---
-            max_intentos = 3
+            # --- LÓGICA DE REINTENTOS AMPLIADA ---
+            import time  # Por si no lo tenías arriba
+            max_intentos = 6
             exito = False
-
-            import time
 
             for intento in range(max_intentos):
                 try:
-                    # Preparamos el archivo en cada intento por si se consume
                     files = {"file": (uploaded_file.name,
                                       img_bytes, uploaded_file.type)}
 
                     response = requests.post(
-                        f"{API_URL}/predict", files=files, headers=headers_analysis)
+                        f"{API_URL}/predict", files=files, headers=headers_analysis, timeout=60)
 
                     if response.status_code == 200:
                         data = response.json()
                         exito = True
 
-                        # Mostrar Resultados
+                        # Mostrar Resultados Visuales
                         if data["is_defective"]:
                             st.markdown(f"""
                             <div class="result-box defect">
@@ -165,25 +164,24 @@ if uploaded_file is not None:
                                 <h3 style="color: #237804;">ACCIÓN: {data['action_required']}</h3>
                             </div>
                             """, unsafe_allow_html=True)
-                        break  # Si sale bien, salimos del bucle de reintentos
+                        break  # ¡Conseguido! Salimos del bucle
 
-                    elif response.status_code == 429:
-                        # Si es el último intento, mostramos error. Si no, esperamos 5 segundos
+                    # Atrapamos tanto el 429 (Bloqueo) como el 503/502 (Arrancando)
+                    elif response.status_code in [429, 502, 503]:
                         if intento < max_intentos - 1:
-                            # Espera 5 segundos antes de reintentar
-                            time.sleep(5)
+                            # Esperamos 15 segundos y volvemos a golpear la puerta
+                            time.sleep(15)
                             continue
                         else:
                             st.error(
-                                "⚠️ El servidor de Inteligencia Artificial sigue arrancando. Por favor, espera 1 minuto y vuelve a darle al botón.")
+                                "⚠️ El servidor de la API está tardando demasiado en arrancar. Por favor, recarga la página en unos segundos.")
                     else:
                         st.error(f"Error del servidor: {response.status_code}")
-                        # Con errores distintos a 429 no reintentamos
                         break
 
                 except Exception as e:
                     if intento < max_intentos - 1:
-                        time.sleep(5)
+                        time.sleep(15)
                         continue
                     else:
                         st.error(

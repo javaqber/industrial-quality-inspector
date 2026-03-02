@@ -12,8 +12,11 @@ st.set_page_config(page_title="IQI - AI Inspector",
 @st.cache_resource(show_spinner=False)
 def despertar_api():
     try:
+        # Añadido el carnet de identidad para evitar bloqueos
+        headers = {"User-Agent": "IQI-Dashboard/1.0"}
+        # CORRECCIÓN 1: Aquí enviamos el 'headers' en la petición
         requests.get(
-            "https://industrial-quality-inspector.onrender.com/docs", timeout=60)
+            "https://industrial-quality-inspector.onrender.com/docs", headers=headers, timeout=60)
         return True
     except:
         return False
@@ -122,8 +125,13 @@ if uploaded_file is not None:
             files = {"file": (uploaded_file.name, img_bytes,
                               uploaded_file.type)}
 
+            # CORRECCIÓN 2: Añadimos el carnet de identidad a la petición principal de análisis
+            headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
+
             try:
-                response = requests.post(f"{API_URL}/predict", files=files)
+                # CORRECCIÓN 3: Pasamos el 'headers_analysis' en el POST
+                response = requests.post(
+                    f"{API_URL}/predict", files=files, headers=headers_analysis)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -149,6 +157,9 @@ if uploaded_file is not None:
                             <h3 style="color: #237804;">ACCIÓN: {data['action_required']}</h3>
                         </div>
                         """, unsafe_allow_html=True)
+                elif response.status_code == 429:
+                    st.error(
+                        "Error 429: El servidor está bloqueando las peticiones por seguridad. Revisa la consola de Render.")
                 else:
                     st.error(f"Error del servidor: {response.status_code}")
 

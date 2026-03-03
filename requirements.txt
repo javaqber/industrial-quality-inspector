@@ -1,8 +1,11 @@
-fastapi
-uvicorn
-python-multipart
+# --- LIBRERÍAS DE LA WEB ---
+streamlit
+pillow
+
+# --- LIBRERÍAS DE VISIÓN ARTIFICIAL ---
 opencv-python-headless
-# Esto le dice a pip que busque versiones ligeras para CPU
+
+# --- LIBRERÍAS DE IA (VERSIÓN CPU PARA RENDER) ---
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision

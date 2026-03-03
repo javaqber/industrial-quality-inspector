@@ -1,25 +1,27 @@
 import streamlit as st
-import requests
+from ultralytics import YOLO  # Se importa la IA directamente al dashboard
 from PIL import Image
+# import requests
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="IQI - AI Inspector",
                    page_icon="🏭", layout="centered")
 
-# --- DESPIERTA LA API ---
+# --- CARGA DEL MODELO DE IA ---
+# cache_resource asegura que el modelo pesado se cargue solo 1 vez en memoria
 
 
 @st.cache_resource(show_spinner=False)
-def despertar_api():
-    try:
-        # Añadido el carnet de identidad para evitar bloqueos
-        headers = {"User-Agent": "IQI-Dashboard/1.0"}
-        # Aquí enviamos el 'headers' en la petición
-        requests.get(
-            "https://industrial-quality-inspector.onrender.com/docs", headers=headers, timeout=60)
-        return True
-    except:
-        return False
+def load_model():
+    # Se añade el archivo de la IA
+    return YOLO("best_aluminio.pt")
+
+
+try:
+    model = load_model()
+except Exception as e:
+    st.error(
+        f"⚠️ Error al cargar el modelo de IA. Verifica que el archivo .pt está en la carpeta: {e}")
 
 
 # --- CSS PERSONALIZADO ---
@@ -95,7 +97,7 @@ st.markdown("""
     <p class="subtitulo-custom">Sistema de Visión Artificial para perfiles de aluminio.</p>
 """, unsafe_allow_html=True)
 
-# --- 3. MENSAJE EFÍMERO (TOAST) ---
+# --- 3. MENSAJE EFÍMERO  ---
 with st.spinner("📡 Conectando con los servidores de Inteligencia Artificial..."):
     is_awake = despertar_api()
 
@@ -127,7 +129,7 @@ if uploaded_file is not None:
             headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
 
             # --- LÓGICA DE REINTENTOS AMPLIADA ---
-            import time  # Por si no lo tenías arriba
+            import time
             max_intentos = 6
             exito = False
 

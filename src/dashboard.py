@@ -105,7 +105,7 @@ if uploaded_file is not None:
 
     # --- 4. BOTÓN E INFERENCIA DIRECTA ---
     if st.button("🔍 Iniciar Análisis con IA"):
-        with st.spinner("🧠 Analizando la imagen localmente..."):
+        with st.spinner("🧠 Analizando la imagen con YOLOv8n..."):
             try:
                 resultados = model(image)
                 result = resultados[0]

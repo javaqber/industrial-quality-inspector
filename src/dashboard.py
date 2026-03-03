@@ -1,7 +1,6 @@
 import streamlit as st
 from ultralytics import YOLO  # Se importa la IA directamente al dashboard
 from PIL import Image
-# import requests
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="IQI - AI Inspector",
@@ -13,7 +12,7 @@ st.set_page_config(page_title="IQI - AI Inspector",
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    # Se añade el archivo de la IA
+    # Cargamos el modelo IA en la raiz del proyecto
     return YOLO("best_aluminio.pt")
 
 
@@ -22,7 +21,6 @@ try:
 except Exception as e:
     st.error(
         f"⚠️ Error al cargar el modelo de IA. Verifica que el archivo .pt está en la carpeta: {e}")
-
 
 # --- CSS PERSONALIZADO ---
 st.markdown("""
@@ -63,12 +61,8 @@ st.markdown("""
         margin-top: -10px;
         margin-bottom: 5px;
     }
-    .titulo-custom .industrial {
-        color: #1a7bb7; /* El azul logo */
-    }
-    .titulo-custom .quality {
-        color: #58595b; /* El gris oscuro logo */
-    }
+    .titulo-custom .industrial { color: #1a7bb7; }
+    .titulo-custom .quality { color: #58595b; }
     .subtitulo-custom {
         text-align: center;
         font-size: 1.1rem;
@@ -78,8 +72,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-API_URL = "https://industrial-quality-inspector.onrender.com"
 
 # --- 1. LOGO CENTRADO ---
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -97,18 +89,9 @@ st.markdown("""
     <p class="subtitulo-custom">Sistema de Visión Artificial para perfiles de aluminio.</p>
 """, unsafe_allow_html=True)
 
-# --- 3. MENSAJE EFÍMERO  ---
-with st.spinner("📡 Conectando con los servidores de Inteligencia Artificial..."):
-    is_awake = despertar_api()
-
-if is_awake:
-    st.toast("✅ Sistema en línea y calibrado. Listo para inspección.", icon="🚀")
-else:
-    st.toast("⚠️ La conexión va lenta, pero puedes intentar subir la pieza.", icon="⏳")
-
 st.markdown("---")
 
-# --- 4. SUBIDA DE IMAGEN MÁS PEQUEÑA ---
+# --- 3. SUBIDA DE IMAGEN ---
 uploaded_file = st.file_uploader(
     "📸 Sube una foto del perfil extruido", type=["jpg", "jpeg", "png"])
 
@@ -120,71 +103,55 @@ if uploaded_file is not None:
     with col_img2:
         st.image(image, caption="Muestra a analizar", use_container_width=True)
 
-   # Botón de Inferencia
+    # --- 4. BOTÓN E INFERENCIA DIRECTA ---
     if st.button("🔍 Iniciar Análisis con IA"):
-        # Actualizamos el mensaje para que el usuario no se asuste si tarda
-        with st.spinner("🧠 Procesando imagen con YOLOv8...(la primera vez puede tardar hasta 1 minuto)"):
-            img_bytes = uploaded_file.getvalue()
+        with st.spinner("🧠 Analizando la imagen localmente..."):
+            try:
+                resultados = model(image)
+                result = resultados[0]
 
-            headers_analysis = {"User-Agent": "IQI-Dashboard/1.0"}
+                # Extraemos los datos de clasificación
+                if hasattr(result, 'probs') and result.probs is not None:
+                    class_id = result.probs.top1
+                    confianza = result.probs.top1conf.item()
+                    defect_detected = result.names[class_id]
+                    confidence_str = f"{confianza * 100:.2f}%"
 
-            # --- LÓGICA DE REINTENTOS AMPLIADA ---
-            import time
-            max_intentos = 6
-            exito = False
-
-            for intento in range(max_intentos):
-                try:
-                    files = {"file": (uploaded_file.name,
-                                      img_bytes, uploaded_file.type)}
-
-                    response = requests.post(
-                        f"{API_URL}/predict", files=files, headers=headers_analysis, timeout=60)
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        exito = True
-
-                        # Mostrar Resultados Visuales
-                        if data["is_defective"]:
-                            st.markdown(f"""
-                            <div class="result-box defect">
-                                <h2 style="color: #a8071a;">❌ DEFECTO DETECTADO</h2>
-                                <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
-                                <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
-                                <hr>
-                                <h3 style="color: #a8071a;">ACCIÓN: {data['action_required']}</h3>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"""
-                            <div class="result-box ok">
-                                <h2 style="color: #237804;">✅ PIEZA APROBADA</h2>
-                                <p class="metric-text"><strong>Categoría:</strong> {data['defect_detected'].upper().replace('_', ' ')}</p>
-                                <p class="metric-text"><strong>Confianza IA:</strong> {data['confidence']}</p>
-                                <hr>
-                                <h3 style="color: #237804;">ACCIÓN: {data['action_required']}</h3>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        break  # ¡Conseguido! Salimos del bucle
-
-                    # Atrapamos tanto el 429 (Bloqueo) como el 503/502 (Arrancando)
-                    elif response.status_code in [429, 502, 503]:
-                        if intento < max_intentos - 1:
-                            # Esperamos 15 segundos antes de volver a llamar
-                            time.sleep(15)
-                            continue
-                        else:
-                            st.error(
-                                "⚠️ El servidor de la API está tardando demasiado en arrancar. Por favor, recarga la página en unos segundos.")
+                    #  EVALUAMOS SI ES DEFECTUOSA O SANA
+                    # Asegúrate de que "clean_sample" es el nombre de la clase buena en YOLO
+                    if defect_detected == "clean_sample" or defect_detected == "ok":
+                        is_defective = False
+                        action_required = "APROBAR PIEZA"
                     else:
-                        st.error(f"Error del servidor: {response.status_code}")
-                        break
+                        is_defective = True
+                        action_required = "DESCARTAR / REVISAR"
+                else:
+                    is_defective = False
+                    defect_detected = "Error de lectura"
+                    confidence_str = "0%"
+                    action_required = "REPETIR FOTO"
 
-                except Exception as e:
-                    if intento < max_intentos - 1:
-                        time.sleep(15)
-                        continue
-                    else:
-                        st.error(
-                            f"Error de conexión con la API tras varios intentos: {e}")
+                # --- 5. MOSTRAR RESULTADOS VISUALES ---
+                if is_defective:
+                    st.markdown(f"""
+                    <div class="result-box defect">
+                        <h2 style="color: #a8071a;">❌ DEFECTO DETECTADO</h2>
+                        <p class="metric-text"><strong>Categoría:</strong> {defect_detected.upper().replace('_', ' ')}</p>
+                        <p class="metric-text"><strong>Confianza IA:</strong> {confidence_str}</p>
+                        <hr>
+                        <h3 style="color: #a8071a;">ACCIÓN: {action_required}</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="result-box ok">
+                        <h2 style="color: #237804;">✅ PIEZA APROBADA</h2>
+                        <p class="metric-text"><strong>Categoría:</strong> {defect_detected.upper().replace('_', ' ')}</p>
+                        <p class="metric-text"><strong>Confianza IA:</strong> {confidence_str}</p>
+                        <hr>
+                        <h3 style="color: #237804;">ACCIÓN: {action_required}</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"Error durante el procesamiento: {e}")

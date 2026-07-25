@@ -17,4 +17,4 @@ __pycache__/
 # Lo ideal es sacar el archivo 'best.pt' fuera si quieres guardarlo,
 # pero no subir todos los gráficos intermedios si pesan mucho.
 runs/detect/
-runs/classify/*/train/weights/last.pt
+runs/classify/*/train/weights/last.pt.env

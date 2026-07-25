@@ -1,19 +1,10 @@
-# --- API ---
 fastapi==0.115.0
 uvicorn==0.30.6
 python-multipart==0.0.9
 pydantic==2.9.0
-
-# --- VISION IA (OpenRouter) ---
-openai
-
-# --- BASE DE DATOS ---
+anthropic==0.34.0
 psycopg2-binary==2.9.9
-
-# --- AUTENTICACION JWT ---
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-
-# --- CONFIGURACION ---
 python-dotenv==1.0.1

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A192F">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="IQI Inspector">
+  <title>IQI Inspector</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{background:#111827;color:#F9FAFB;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden}
+    input,button,select,textarea{font-family:inherit}
+
+    /* HEADER */
+    .header{background:#0A1628;border-bottom:1px solid #1E3A5F;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .header-logo{display:flex;align-items:center;gap:10px}
+    .header-icon{width:32px;height:32px;background:#0B3D91;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+    .header-title{font-size:15px;font-weight:700;letter-spacing:.04em}
+    .header-title span{color:#4A90D9}
+    .header-sub{font-size:10px;color:#6B7280;margin-top:-2px}
+    .header-right{display:flex;align-items:center;gap:8px}
+    .btn-logout{background:transparent;border:1px solid #374151;color:#9CA3AF;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+    .badge{background:#1E3A5F;border-radius:20px;padding:3px 10px;font-size:11px;color:#93C5FD}
+
+    /* BODY */
+    .body{padding:16px;display:flex;flex-direction:column;gap:14px;min-height:calc(100vh - 62px)}
+
+    /* LABEL */
+    .lbl{font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:7px}
+
+    /* TIPO PIEZA */
+    .tipos{display:flex;gap:6px;flex-wrap:wrap}
+    .tipo-btn{padding:7px 14px;border-radius:20px;border:1px solid #374151;background:transparent;color:#9CA3AF;font-size:12px;cursor:pointer;transition:all .15s}
+    .tipo-btn.active{border-color:#0B3D91;background:#1E3A5F;color:#93C5FD;font-weight:600}
+
+    /* UPLOAD */
+    .upload-zone{border:2px dashed #374151;border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;background:#1F2937;transition:border-color .2s}
+    .upload-zone:hover{border-color:#0B3D91}
+    .upload-icon{font-size:36px;display:block;margin-bottom:10px}
+    .upload-title{font-size:15px;font-weight:600;color:#D1D5DB;margin-bottom:4px}
+    .upload-sub{font-size:12px;color:#6B7280}
+    .thumb-row{display:flex;gap:8px;flex-wrap:wrap}
+    .thumb{position:relative;width:80px;height:80px}
+    .thumb img{width:100%;height:100%;object-fit:cover;border-radius:8px;border:2px solid #374151}
+    .thumb-rm{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#DC2626;border:none;color:white;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:bold;line-height:1}
+    .thumb-add{width:80px;height:80px;border:2px dashed #374151;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6B7280;font-size:28px}
+
+    /* BOTONES */
+    .btn{width:100%;padding:16px;border-radius:12px;border:none;color:white;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em;transition:opacity .2s}
+    .btn-primary{background:#0B3D91}
+    .btn-primary:hover{opacity:.9}
+    .btn-primary:disabled{background:#374151;cursor:default}
+    .btn-success{background:#059669}
+    .btn-danger{background:#DC2626}
+
+    /* CARDS */
+    .card{background:#1F2937;border-radius:10px;padding:13px 15px}
+    .card-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;margin-bottom:5px}
+
+    /* RESULTADO */
+    .result-header{display:flex;flex-direction:column;align-items:center;padding:28px 20px;border-bottom:2px solid}
+    .result-circle{width:90px;height:90px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:900;color:white}
+    .result-label{font-size:26px;font-weight:800;letter-spacing:.08em;margin-top:10px}
+    .result-summary{font-size:13px;color:rgba(255,255,255,.8);text-align:center;padding:0 16px 14px;font-weight:500;margin-top:6px}
+
+    /* PROGRESS */
+    .progress-bar{height:8px;background:#374151;border-radius:4px;overflow:hidden;margin-bottom:4px}
+    .progress-fill{height:100%;border-radius:4px;transition:width .5s ease}
+
+    /* VERIFY */
+    .verify-row{display:flex;gap:8px}
+    .verify-btn{flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid}
+    .corr-row{display:flex;gap:6px;margin-bottom:10px}
+    .corr-btn{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #374151;background:transparent}
+
+    /* HISTORIAL */
+    .hist-item{display:flex;align-items:center;justify-content:space-between;background:#1F2937;border-radius:8px;padding:10px 14px;margin-bottom:6px}
+    .hist-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+
+    /* LOGIN */
+    .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+    .login-logo{font-size:40px;font-weight:800;margin-bottom:6px;text-align:center}
+    .login-logo span{color:#4A90D9}
+    .login-sub{font-size:14px;color:#6B7280;margin-bottom:32px;text-align:center}
+    .login-card{background:#1F2937;border-radius:14px;padding:24px;width:100%;max-width:360px}
+    .login-field{margin-bottom:14px}
+    .login-field label{display:block;font-size:12px;color:#9CA3AF;margin-bottom:5px;font-weight:500}
+    .login-input{width:100%;background:#111827;border:1px solid #374151;border-radius:8px;padding:11px 14px;color:white;font-size:14px;outline:none;transition:border-color .2s}
+    .login-input:focus{border-color:#0B3D91}
+    .error-box{background:#450A0A;border:1px solid #DC2626;border-radius:8px;padding:10px 14px;font-size:13px;color:#FCA5A5;margin-bottom:12px}
+    .success-msg{background:#064E3B;border:1px solid #059669;border-radius:8px;padding:10px 14px;font-size:13px;color:#6EE7B7;text-align:center}
+
+    /* SPINNER */
+    .spinner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+    .spinner{width:60px;height:60px;border:4px solid #0B3D91;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* BOTTOM NAV */
+    .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0A1628;border-top:1px solid #1E3A5F;display:flex}
+    .nav-btn{flex:1;padding:12px 0 10px;background:transparent;border:none;color:#6B7280;font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:color .15s}
+    .nav-btn.active{color:#4A90D9}
+    .nav-icon{font-size:20px}
+    .has-nav{padding-bottom:70px}
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const VERDE='#059669', AMARILLO='#D97706', ROJO='#DC2626', AZUL='#0B3D91';
+const R={
+  OK:     {bg:'#064E3B',accent:VERDE,   borde:'#065F46',icon:'✓',label:'APROBADO'},
+  REVISAR:{bg:'#451A03',accent:AMARILLO,borde:'#78350F',icon:'!',label:'REVISAR'},
+  NOK:    {bg:'#450A0A',accent:ROJO,    borde:'#7F1D1D',icon:'✗',label:'RECHAZADO'}
+};
+const TIPOS=[
+  {id:'aluminio',label:'Aluminio'},
+  {id:'metal',label:'Metal'},
+  {id:'plastico',label:'Plástico'},
+  {id:'soldadura',label:'Soldadura'},
+  {id:'general',label:'General'}
+];
+
+// Estado global
+let S={
+  screen:'login',   // login | home | analyzing | result | history
+  tab:'home',
+  token:localStorage.getItem('iqi_token')||null,
+  usuario:null,
+  tipoPieza:'general',
+  images:[],        // {file, preview}
+  resultado:null,
+  verificacion:null,
+  correccion:null,
+  historial:[],
+  error:null,
+  loading:false
+};
+
+// Si hay token guardado, intentar arrancar directo en home
+if(S.token){
+  const u=localStorage.getItem('iqi_usuario');
+  if(u) try{S.usuario=JSON.parse(u);S.screen='home';}catch(e){}
+}
+
+function esc(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+
+function render(){
+  const app=document.getElementById('app');
+  if(S.screen==='login'){app.innerHTML=renderLogin();bindLogin();}
+  else if(S.screen==='analyzing'){app.innerHTML=renderAnalyzing();}
+  else if(S.screen==='result'){app.innerHTML=renderResult();bindResult();}
+  else{app.innerHTML=renderMain();bindMain();}
+}
+
+// ── LOGIN ──────────────────────────────────────────────────────────────────
+
+function renderLogin(){
+  return`<div class="login-wrap">
+    <div class="login-logo"><span>IQ</span>Inspector</div>
+    <div class="login-sub">Control de calidad con IA</div>
+    <div class="login-card">
+      ${S.error?`<div class="error-box">${esc(S.error)}</div>`:''}
+      <div class="login-field">
+        <label>Email</label>
+        <input id="email" class="login-input" type="email" placeholder="tu@email.com" autocomplete="email">
+      </div>
+      <div class="login-field">
+        <label>Contraseña</label>
+        <input id="pwd" class="login-input" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="btn-login" style="margin-top:6px">
+        Entrar
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindLogin(){
+  document.getElementById('btn-login').addEventListener('click', doLogin);
+  document.getElementById('pwd').addEventListener('keydown', e=>{if(e.key==='Enter')doLogin();});
+}
+
+async function doLogin(){
+  const email=document.getElementById('email').value.trim();
+  const pwd=document.getElementById('pwd').value;
+  if(!email||!pwd){S.error='Introduce email y contraseña.';render();return;}
+  S.error=null;
+  document.getElementById('btn-login').textContent='Entrando...';
+  try{
+    const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+    const d=await r.json();
+    if(r.ok){
+      S.token=d.access_token;
+      S.usuario={nombre:d.nombre,rol:d.rol,empresa_id:d.empresa_id};
+      localStorage.setItem('iqi_token',S.token);
+      localStorage.setItem('iqi_usuario',JSON.stringify(S.usuario));
+      S.screen='home';S.tab='home';
+    }else{
+      S.error=d.detail||'Error de acceso.';
+    }
+  }catch(e){S.error='No se pudo conectar con el servidor.';}
+  render();
+}
+
+// ── MAIN (HOME + HISTORY) ─────────────────────────────────────────────────
+
+function renderMain(){
+  const tab=S.tab;
+  return`
+    <div class="header">
+      <div class="header-logo">
+        <div class="header-icon">🔍</div>
+        <div>
+          <div class="header-title"><span>IQ</span>Inspector</div>
+          <div class="header-sub">Control de calidad con IA</div>
+        </div>
+      </div>
+      <div class="header-right">
+        ${S.historial.length>0?`<div class="badge">${S.historial.length}</div>`:''}
+        <button class="btn-logout" id="btn-logout">Salir</button>
+      </div>
+    </div>
+    <div class="body has-nav">
+      ${tab==='home'?renderHome():renderHistory()}
+    </div>
+    <div class="bottom-nav">
+      <button class="nav-btn ${tab==='home'?'active':''}" data-tab="home">
+        <span class="nav-icon">📷</span>
+        <span>Inspección</span>
+      </button>
+      <button class="nav-btn ${tab==='history'?'active':''}" data-tab="history">
+        <span class="nav-icon">📋</span>
+        <span>Historial</span>
+      </button>
+    </div>`;
+}
+
+function renderHome(){
+  const tipos=TIPOS.map(t=>`<button class="tipo-btn ${t.id===S.tipoPieza?'active':''}" data-tipo="${t.id}">${t.label}</button>`).join('');
+
+  let fotosHtml='';
+  if(S.images.length===0){
+    fotosHtml=`<div class="upload-zone" id="zone">
+      <span class="upload-icon">📸</span>
+      <div class="upload-title">Fotografiar la pieza</div>
+      <div class="upload-sub">Usa la cámara o selecciona hasta 3 fotos</div>
+    </div>`;
+  }else{
+    const thumbs=S.images.map((img,i)=>`<div class="thumb"><img src="${img.preview}" alt=""><button class="thumb-rm" data-idx="${i}">×</button></div>`).join('');
+    const add=S.images.length<3?`<div class="thumb-add" id="zone">+</div>`:'';
+    fotosHtml=`<div class="thumb-row">${thumbs}${add}</div>`;
+  }
+
+  const errHtml=S.error?`<div class="error-box">${esc(S.error)}</div>`:'';
+
+  return`${errHtml}
+    <div>
+      <span class="lbl">Tipo de pieza</span>
+      <div class="tipos">${tipos}</div>
+    </div>
+    <div>
+      <span class="lbl">Fotos (${S.images.length}/3)</span>
+      ${fotosHtml}
+      <input type="file" id="file-inp" accept="image/*" multiple capture="environment" style="display:none">
+    </div>
+    <button class="btn btn-primary" id="btn-analyze" ${S.images.length===0?'disabled':''}>
+      🔍 Analizar con IA
+    </button>`;
+}
+
+function renderHistory(){
+  if(S.historial.length===0)return`<div style="text-align:center;padding:60px 20px;color:#6B7280">No hay inspecciones todavía</div>`;
+  const items=[...S.historial].reverse().map(h=>{
+    const c={OK:VERDE,REVISAR:AMARILLO,NOK:ROJO}[h.verificado||h.resultado]||'#6B7280';
+    return`<div class="hist-item">
+      <div>
+        <div style="font-size:13px;color:#D1D5DB;font-weight:500">${esc(h.tipo_pieza||h.tipo)}</div>
+        <div style="font-size:11px;color:#6B7280">${esc(h.ts||h.timestamp||'')}</div>
+        ${h.defecto?`<div style="font-size:11px;color:#9CA3AF;margin-top:2px">${esc(h.defecto)}</div>`:''}
+      </div>
+      <div class="hist-badge" style="background:${c}22;color:${c}">${h.verificado||h.resultado}</div>
+    </div>`;
+  }).join('');
+  return`<div><span class="lbl">Inspecciones recientes</span>${items}</div>`;
+}
+
+function bindMain(){
+  document.getElementById('btn-logout')?.addEventListener('click',()=>{
+    S.token=null;S.usuario=null;S.historial=[];S.images=[];
+    localStorage.removeItem('iqi_token');localStorage.removeItem('iqi_usuario');
+    S.screen='login';render();
+  });
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;render();}));
+  document.querySelectorAll('.tipo-btn[data-tipo]').forEach(b=>b.addEventListener('click',()=>{S.tipoPieza=b.dataset.tipo;render();}));
+  document.querySelector('.thumb-rm')&&document.querySelectorAll('.thumb-rm').forEach(b=>b.addEventListener('click',e=>{
+    const i=parseInt(e.currentTarget.dataset.idx);
+    S.images.splice(i,1);render();
+  }));
+  document.getElementById('zone')?.addEventListener('click',()=>document.getElementById('file-inp')?.click());
+  document.getElementById('file-inp')?.addEventListener('change',handleFiles);
+  document.getElementById('btn-analyze')?.addEventListener('click',doAnalyze);
+}
+
+function handleFiles(e){
+  const files=Array.from(e.target.files).slice(0,3-S.images.length);
+  let loaded=0;
+  if(!files.length)return;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      S.images.push({file:f,preview:ev.target.result});
+      if(++loaded===files.length)render();
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+// ── ANALIZAR ────────────────────────────────────────────────────────────────
+
+async function doAnalyze(){
+  if(!S.images.length)return;
+  S.screen='analyzing';S.error=null;S.verificacion=null;S.correccion=null;
+  render();
+  try{
+    const fd=new FormData();
+    fd.append('tipo_pieza',S.tipoPieza);
+    S.images.forEach(img=>fd.append('images',img.file));
+
+    const r=await fetch('/iqi/analyze',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${S.token}`},
+      body:fd
+    });
+
+    if(r.status===401){
+      S.token=null;localStorage.removeItem('iqi_token');
+      S.screen='login';S.error='Sesión expirada. Por favor inicia sesión de nuevo.';
+      render();return;
+    }
+
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'Error en el análisis.');
+
+    S.resultado={...d,ts:new Date().toLocaleTimeString('es-ES')};
+    S.screen='result';
+  }catch(e){
+    S.error=e.message||'Error al analizar. Inténtalo de nuevo.';
+    S.screen='home';S.tab='home';
+  }
+  render();
+}
+
+// ── RESULTADO ──────────────────────────────────────────────────────────────
+
+function renderResult(){
+  const res=S.resultado;
+  if(!res)return'';
+  const cfg=R[res.resultado]||{bg:'#1F2937',accent:'#6B7280',borde:'#374151',icon:'?',label:'—'};
+
+  const defHtml=res.defecto?`
+    <div class="card" style="border-left:3px solid ${cfg.accent}">
+      <div class="card-label" style="color:${cfg.accent}">Defecto detectado</div>
+      <div style="font-size:14px;color:#F9FAFB;font-weight:600;line-height:1.5">${esc(res.defecto)}</div>
+      ${res.zona?`<div style="font-size:11px;color:#9CA3AF;margin-top:5px">📍 Zona: ${esc(res.zona)}</div>`:''}
+    </div>`:'';
+
+  const accionHtml=`
+    <div class="card" style="border-left:3px solid ${cfg.accent}">
+      <div class="card-label" style="color:${cfg.accent}">Acción recomendada</div>
+      <div style="font-size:14px;color:#F9FAFB;font-weight:600;line-height:1.5">${esc(res.accion)}</div>
+    </div>`;
+
+  let verifyHtml='';
+  if(!S.verificacion){
+    verifyHtml=`<div class="card">
+      <div style="font-size:12px;font-weight:600;color:#D1D5DB;margin-bottom:10px">¿El resultado es correcto?</div>
+      <div class="verify-row">
+        <button class="verify-btn" id="v-si" style="background:#064E3B;border-color:${VERDE};color:${VERDE}">✓ Correcto</button>
+        <button class="verify-btn" id="v-no" style="background:#450A0A;border-color:${ROJO};color:${ROJO}">✗ Corregir</button>
+      </div>
+    </div>`;
+  }else if(S.verificacion==='no'){
+    const corrBtns=['OK','REVISAR','NOK'].map(op=>{
+      const c={OK:VERDE,REVISAR:AMARILLO,NOK:ROJO}[op];
+      const act=S.correccion===op;
+      return`<button class="corr-btn" data-op="${op}" style="border-color:${act?c:'#374151'};background:${act?c+'22':'transparent'};color:${c}">${op}</button>`;
+    }).join('');
+    verifyHtml=`<div class="card">
+      <div style="font-size:12px;font-weight:600;color:#D1D5DB;margin-bottom:8px">Resultado correcto:</div>
+      <div class="corr-row">${corrBtns}</div>
+      <button id="v-save" class="btn" style="background:${S.correccion?AZUL:'#374151'};padding:10px;font-size:13px" ${S.correccion?'':'disabled'}>Guardar corrección</button>
+    </div>`;
+  }else{
+    const msg=S.verificacion==='si'?'Resultado confirmado':`Corregido a: ${S.correccion}`;
+    verifyHtml=`<div class="success-msg">✓ ${esc(msg)}</div>`;
+  }
+
+  return`
+    <div class="header">
+      <div class="header-logo">
+        <div class="header-icon">🔍</div>
+        <div>
+          <div class="header-title"><span>IQ</span>Inspector</div>
+          <div class="header-sub">Resultado del análisis</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column">
+      <div class="result-header" style="background:${cfg.bg};border-color:${cfg.borde}">
+        <div class="result-circle" style="background:${cfg.accent};box-shadow:0 0 36px ${cfg.accent}55">${cfg.icon}</div>
+        <div class="result-label" style="color:${cfg.accent}">${cfg.label}</div>
+      </div>
+      <div style="padding:15px 16px;display:flex;flex-direction:column;gap:10px;flex:1">
+        <div class="card">
+          <div class="card-label">Confianza del análisis</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${res.confianza}%;background:${cfg.accent}"></div></div>
+          <div style="text-align:right;font-size:14px;font-weight:700;color:${cfg.accent}">${res.confianza}%</div>
+        </div>
+        ${defHtml}
+        ${accionHtml}
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#6B7280">
+          <span>Tipo: ${esc(res.tipo_pieza)}</span><span>${esc(res.ts)}</span>
+        </div>
+        ${verifyHtml}
+        <button class="btn btn-primary" id="btn-new">📷 Nueva inspección</button>
+      </div>
+    </div>`;
+}
+
+function bindResult(){
+  document.getElementById('btn-new')?.addEventListener('click',()=>{
+    S.images=[];S.resultado=null;S.verificacion=null;S.correccion=null;
+    S.screen='home';S.tab='home';render();
+  });
+  document.getElementById('v-si')?.addEventListener('click',()=>doVerify('si'));
+  document.getElementById('v-no')?.addEventListener('click',()=>{S.verificacion='no';render();});
+  document.querySelectorAll('.corr-btn[data-op]').forEach(b=>b.addEventListener('click',()=>{S.correccion=b.dataset.op;render();}));
+  document.getElementById('v-save')?.addEventListener('click',()=>doVerify('save'));
+}
+
+async function doVerify(tipo){
+  const res=S.resultado;
+  if(!res)return;
+  const resultado_operario=tipo==='si'?res.resultado:S.correccion;
+  S.verificacion=tipo;
+
+  // Guardar en historial local siempre
+  S.historial.push({...res,verificado:resultado_operario});
+
+  // Enviar al backend si hay analisis_id
+  if(res.analisis_id){
+    try{
+      await fetch('/iqi/verify',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.token}`},
+        body:JSON.stringify({
+          analisis_id:res.analisis_id,
+          resultado_ia:res.resultado,
+          resultado_operario
+        })
+      });
+    }catch(e){console.warn('Error guardando verificación:',e);}
+  }
+  render();
+}
+
+// ── ANALYZING ─────────────────────────────────────────────────────────────
+
+function renderAnalyzing(){
+  const previews=S.images.map(img=>`<img src="${img.preview}" style="width:55px;height:55px;object-fit:cover;border-radius:8px;opacity:.6" alt="">`).join('');
+  return`
+    <div class="header">
+      <div class="header-logo">
+        <div class="header-icon">🔍</div>
+        <div>
+          <div class="header-title"><span>IQ</span>Inspector</div>
+          <div class="header-sub">Analizando pieza...</div>
+        </div>
+      </div>
+    </div>
+    <div class="body spinner-wrap">
+      <div class="spinner"></div>
+      <div style="text-align:center">
+        <div style="font-size:17px;font-weight:700;margin-bottom:6px">Analizando con IA...</div>
+        <div style="font-size:12px;color:#6B7280">Procesando ${S.images.length} imagen${S.images.length>1?'es':''}</div>
+      </div>
+      <div style="display:flex;gap:8px">${previews}</div>
+    </div>`;
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

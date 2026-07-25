@@ -1,12 +1,19 @@
-# --- LIBRERÍAS DE LA WEB ---
-streamlit
-pillow
+# --- API ---
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+pydantic==2.9.0
 
-# --- LIBRERÍAS DE VISIÓN ARTIFICIAL ---
-opencv-python-headless
+# --- VISION IA (OpenRouter) ---
+openai
 
-# --- LIBRERÍAS DE IA (VERSIÓN CPU PARA RENDER) ---
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
-ultralytics
+# --- BASE DE DATOS ---
+psycopg2-binary==2.9.9
+
+# --- AUTENTICACION JWT ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# --- CONFIGURACION ---
+python-dotenv==1.0.1

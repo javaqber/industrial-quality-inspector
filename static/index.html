@@ -126,21 +126,22 @@ const TIPOS=[
 
 // Estado global
 let S={
-  screen:'login',   // login | home | analyzing | result | history
+  screen:'login',
   tab:'home',
   token:localStorage.getItem('iqi_token')||null,
   usuario:null,
   tipoPieza:'general',
-  images:[],        // {file, preview}
+  images:[],
   resultado:null,
   verificacion:null,
   correccion:null,
   historial:[],
+  stats:null,
   error:null,
   loading:false
 };
 
-// Si hay token guardado, intentar arrancar directo en home
+// Si hay token guardado, arrancar directo en home y cargar datos
 if(S.token){
   const u=localStorage.getItem('iqi_usuario');
   if(u) try{S.usuario=JSON.parse(u);S.screen='home';}catch(e){}
@@ -204,11 +205,45 @@ async function doLogin(){
       localStorage.setItem('iqi_token',S.token);
       localStorage.setItem('iqi_usuario',JSON.stringify(S.usuario));
       S.screen='home';S.tab='home';
+      render();
+      await Promise.all([loadHistorial(),loadStats()]);
+      render();
+      return;
     }else{
       S.error=d.detail||'Error de acceso.';
     }
   }catch(e){S.error='No se pudo conectar con el servidor.';}
   render();
+}
+
+// ── CARGA DE DATOS DESDE SERVIDOR ──────────────────────────────────────────
+
+async function loadHistorial(){
+  if(!S.token)return;
+  try{
+    const r=await fetch('/iqi/history?limite=100',{
+      headers:{'Authorization':`Bearer ${S.token}`}
+    });
+    if(r.ok){
+      const data=await r.json();
+      S.historial=data.map(h=>({
+        ...h,
+        tipo:h.tipo_pieza,
+        ts:h.timestamp,
+        verificado:h.resultado
+      }));
+    }
+  }catch(e){console.warn('Error cargando historial:',e);}
+}
+
+async function loadStats(){
+  if(!S.token)return;
+  try{
+    const r=await fetch('/iqi/stats',{
+      headers:{'Authorization':`Bearer ${S.token}`}
+    });
+    if(r.ok) S.stats=await r.json();
+  }catch(e){console.warn('Error cargando stats:',e);}
 }
 
 // ── MAIN (HOME + HISTORY) ─────────────────────────────────────────────────
@@ -230,7 +265,7 @@ function renderMain(){
       </div>
     </div>
     <div class="body has-nav">
-      ${tab==='home'?renderHome():renderHistory()}
+      ${tab==='home'?renderHome():tab==='history'?renderHistory():renderStats()}
     </div>
     <div class="bottom-nav">
       <button class="nav-btn ${tab==='home'?'active':''}" data-tab="home">
@@ -240,6 +275,10 @@ function renderMain(){
       <button class="nav-btn ${tab==='history'?'active':''}" data-tab="history">
         <span class="nav-icon">📋</span>
         <span>Historial</span>
+      </button>
+      <button class="nav-btn ${tab==='stats'?'active':''}" data-tab="stats">
+        <span class="nav-icon">📊</span>
+        <span>Estadísticas</span>
       </button>
     </div>`;
 }
@@ -278,19 +317,99 @@ function renderHome(){
 }
 
 function renderHistory(){
-  if(S.historial.length===0)return`<div style="text-align:center;padding:60px 20px;color:#6B7280">No hay inspecciones todavía</div>`;
+  if(S.historial.length===0)return`
+    <div style="text-align:center;padding:60px 20px;color:#6B7280">
+      <div style="font-size:36px;margin-bottom:12px">📋</div>
+      <div style="font-size:14px;font-weight:500;color:#9CA3AF">No hay inspecciones todavía</div>
+      <div style="font-size:12px;margin-top:6px">Los análisis aparecerán aquí</div>
+    </div>`;
   const items=[...S.historial].reverse().map(h=>{
-    const c={OK:VERDE,REVISAR:AMARILLO,NOK:ROJO}[h.verificado||h.resultado]||'#6B7280';
+    const resultado=h.verificado||h.resultado;
+    const c={OK:VERDE,REVISAR:AMARILLO,NOK:ROJO}[resultado]||'#6B7280';
+    const tipo=h.tipo_pieza||h.tipo||'—';
+    const tiempo=h.ts||h.timestamp||'';
+    const tiempoFmt=tiempo.length>10?tiempo.slice(0,16).replace('T',' '):tiempo;
     return`<div class="hist-item">
-      <div>
-        <div style="font-size:13px;color:#D1D5DB;font-weight:500">${esc(h.tipo_pieza||h.tipo)}</div>
-        <div style="font-size:11px;color:#6B7280">${esc(h.ts||h.timestamp||'')}</div>
-        ${h.defecto?`<div style="font-size:11px;color:#9CA3AF;margin-top:2px">${esc(h.defecto)}</div>`:''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:#D1D5DB;font-weight:500">${esc(tipo)}</div>
+        <div style="font-size:11px;color:#6B7280">${esc(tiempoFmt)}</div>
+        ${h.defecto?`<div style="font-size:11px;color:#9CA3AF;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.defecto)}</div>`:''}
       </div>
-      <div class="hist-badge" style="background:${c}22;color:${c}">${h.verificado||h.resultado}</div>
+      <div class="hist-badge" style="background:${c}22;color:${c};flex-shrink:0;margin-left:8px">${resultado}</div>
     </div>`;
   }).join('');
-  return`<div><span class="lbl">Inspecciones recientes</span>${items}</div>`;
+  return`<div>
+    <span class="lbl">Inspecciones (${S.historial.length})</span>
+    ${items}
+  </div>`;
+}
+
+function renderStats(){
+  if(!S.stats)return`
+    <div style="text-align:center;padding:60px 20px;color:#6B7280">
+      <div style="font-size:36px;margin-bottom:12px">📊</div>
+      <div style="font-size:14px;color:#9CA3AF">Cargando estadísticas...</div>
+    </div>`;
+
+  const {total_analisis,ok,revisar,nok,confianza_media,verificaciones,tasa_concordancia}=S.stats;
+  const pOk=total_analisis>0?Math.round(ok/total_analisis*100):0;
+  const pRev=total_analisis>0?Math.round(revisar/total_analisis*100):0;
+  const pNok=total_analisis>0?Math.round(nok/total_analisis*100):0;
+  const colConc=tasa_concordancia>=80?VERDE:tasa_concordancia>=60?AMARILLO:ROJO;
+
+  return`<div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="card" style="text-align:center">
+        <div style="font-size:34px;font-weight:800;color:#4A90D9;line-height:1">${total_analisis}</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:4px">Total inspecciones</div>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-size:34px;font-weight:800;color:#4A90D9;line-height:1">${confianza_media}%</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:4px">Confianza media</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="lbl">Distribución de resultados</span>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;color:${VERDE};font-weight:600">✓ OK</span>
+        <span style="font-size:13px;color:${VERDE};font-weight:700">${ok} · ${pOk}%</span>
+      </div>
+      <div class="progress-bar" style="margin-bottom:12px">
+        <div class="progress-fill" style="width:${pOk}%;background:${VERDE}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;color:${AMARILLO};font-weight:600">! REVISAR</span>
+        <span style="font-size:13px;color:${AMARILLO};font-weight:700">${revisar} · ${pRev}%</span>
+      </div>
+      <div class="progress-bar" style="margin-bottom:12px">
+        <div class="progress-fill" style="width:${pRev}%;background:${AMARILLO}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;color:${ROJO};font-weight:600">✗ NOK</span>
+        <span style="font-size:13px;color:${ROJO};font-weight:700">${nok} · ${pNok}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:${pNok}%;background:${ROJO}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="lbl">Verificaciones del operario</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:#4A90D9;line-height:1">${verificaciones}</div>
+          <div style="font-size:11px;color:#6B7280;margin-top:4px">Verificadas</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:${colConc};line-height:1">${tasa_concordancia}%</div>
+          <div style="font-size:11px;color:#6B7280;margin-top:4px">Concordancia IA</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="loadStats().then(()=>render())">↻ Actualizar</button>
+  </div>`;
 }
 
 function bindMain(){
@@ -366,18 +485,11 @@ function renderResult(){
   if(!res)return'';
   const cfg=R[res.resultado]||{bg:'#1F2937',accent:'#6B7280',borde:'#374151',icon:'?',label:'—'};
 
-  const defHtml=res.defecto?`
-    <div class="card" style="border-left:3px solid ${cfg.accent}">
-      <div class="card-label" style="color:${cfg.accent}">Defecto detectado</div>
-      <div style="font-size:14px;color:#F9FAFB;font-weight:600;line-height:1.5">${esc(res.defecto)}</div>
-      ${res.zona?`<div style="font-size:11px;color:#9CA3AF;margin-top:5px">📍 Zona: ${esc(res.zona)}</div>`:''}
-    </div>`:'';
-
-  const accionHtml=`
-    <div class="card" style="border-left:3px solid ${cfg.accent}">
-      <div class="card-label" style="color:${cfg.accent}">Acción recomendada</div>
-      <div style="font-size:14px;color:#F9FAFB;font-weight:600;line-height:1.5">${esc(res.accion)}</div>
-    </div>`;
+  const defHtml=res.defecto?`<div class="card">
+    <div class="card-label">Defecto detectado</div>
+    <div style="font-size:13px;color:#F9FAFB">${esc(res.defecto)}</div>
+    ${res.zona?`<div style="font-size:11px;color:#9CA3AF;margin-top:3px">Zona: ${esc(res.zona)}</div>`:''}
+  </div>`:'';
 
   let verifyHtml='';
   if(!S.verificacion){
@@ -418,15 +530,19 @@ function renderResult(){
       <div class="result-header" style="background:${cfg.bg};border-color:${cfg.borde}">
         <div class="result-circle" style="background:${cfg.accent};box-shadow:0 0 36px ${cfg.accent}55">${cfg.icon}</div>
         <div class="result-label" style="color:${cfg.accent}">${cfg.label}</div>
+        <div class="result-summary">${esc(res.resumen)}</div>
       </div>
       <div style="padding:15px 16px;display:flex;flex-direction:column;gap:10px;flex:1">
         <div class="card">
           <div class="card-label">Confianza del análisis</div>
           <div class="progress-bar"><div class="progress-fill" style="width:${res.confianza}%;background:${cfg.accent}"></div></div>
-          <div style="text-align:right;font-size:14px;font-weight:700;color:${cfg.accent}">${res.confianza}%</div>
+          <div style="text-align:right;font-size:15px;font-weight:700;color:${cfg.accent}">${res.confianza}%</div>
         </div>
         ${defHtml}
-        ${accionHtml}
+        <div class="card" style="background:${cfg.accent}18;border:1px solid ${cfg.accent}44">
+          <div class="card-label" style="color:${cfg.accent}">Acción recomendada</div>
+          <div style="font-size:13px;color:#F9FAFB;font-weight:600">${esc(res.accion)}</div>
+        </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#6B7280">
           <span>Tipo: ${esc(res.tipo_pieza)}</span><span>${esc(res.ts)}</span>
         </div>
@@ -499,6 +615,9 @@ function renderAnalyzing(){
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 render();
+if(S.token){
+  Promise.all([loadHistorial(),loadStats()]).then(()=>render());
+}
 </script>
 </body>
 </html>

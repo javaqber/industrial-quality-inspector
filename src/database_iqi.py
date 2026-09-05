@@ -1,5 +1,26 @@
+"""
+IQI — Database layer (Fase 0B)
+================================
+PostgreSQL CRUD for IQI Aluminium.
+
+Shared tables with AuraPredict: empresas, usuarios
+IQI-specific tables: tipos_pieza_iqi, analisis_iqi, verificaciones_iqi
+
+Changes from Fase 0B:
+  - init_iqi_db() is now EXPLICIT — no longer called at import time.
+    Call it manually at app startup (from api_iqi.py lifespan event).
+  - SQL injection fixed in obtener_stats_iqi: no more f-string SQL.
+  - All functions use parameterised queries only.
+
+PENDING (next phase):
+  - timestamps should migrate from TEXT → TIMESTAMPTZ for proper date filtering.
+    Current: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    Target:  datetime.now(timezone.utc)  with TIMESTAMPTZ columns.
+"""
+
 import os
 import json
+import logging
 import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
@@ -8,16 +29,23 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+logger = logging.getLogger(__name__)
+
 
 def get_conn():
-    """Devuelve una conexión a PostgreSQL."""
+    """Return a PostgreSQL connection."""
     return psycopg2.connect(DATABASE_URL)
 
 
-# ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
+# ─── INITIALISATION ───────────────────────────────────────────────────────────
 
 def init_iqi_db():
-    """Crea las tablas de IQI si no existen."""
+    """
+    Create IQI tables if they do not exist.
+
+    MUST be called explicitly at application startup.
+    NOT called at import time — callers control when the DB connection happens.
+    """
     conn = get_conn()
     cur = conn.cursor()
 
@@ -49,6 +77,8 @@ def init_iqi_db():
             modelo_usado    TEXT DEFAULT 'claude-sonnet-4-6'
         )
     """)
+    # NOTE: timestamp is TEXT for backward-compatibility.
+    # Next phase migration: ALTER TABLE analisis_iqi ALTER COLUMN timestamp TYPE TIMESTAMPTZ
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS verificaciones_iqi (
@@ -66,36 +96,38 @@ def init_iqi_db():
     conn.commit()
     cur.close()
     conn.close()
+    logger.info("IQI database tables verified/created.")
 
 
 # ─── TIPOS DE PIEZA ────────────────────────────────────────────────────────────
 
 def obtener_tipos_pieza(empresa_id=None):
-    """Devuelve los tipos de pieza disponibles para una empresa."""
+    """Return active piece types for a company (or all if empresa_id is None)."""
     conn = get_conn()
     cur = conn.cursor()
-    if empresa_id:
-        cur.execute("""
-            SELECT id, nombre, descripcion, defectos
-            FROM tipos_pieza_iqi
-            WHERE activo = TRUE AND (empresa_id = %s OR empresa_id IS NULL)
-            ORDER BY nombre
-        """, (empresa_id,))
-    else:
-        cur.execute("""
-            SELECT id, nombre, descripcion, defectos
-            FROM tipos_pieza_iqi
-            WHERE activo = TRUE
-            ORDER BY nombre
-        """)
-    filas = cur.fetchall()
-    cur.close()
-    conn.close()
-    return filas
+    try:
+        if empresa_id:
+            cur.execute("""
+                SELECT id, nombre, descripcion, defectos
+                FROM tipos_pieza_iqi
+                WHERE activo = TRUE AND (empresa_id = %s OR empresa_id IS NULL)
+                ORDER BY nombre
+            """, (empresa_id,))
+        else:
+            cur.execute("""
+                SELECT id, nombre, descripcion, defectos
+                FROM tipos_pieza_iqi
+                WHERE activo = TRUE
+                ORDER BY nombre
+            """)
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
 
 
 def crear_tipo_pieza(nombre, descripcion, defectos, empresa_id=None):
-    """Registra un nuevo tipo de pieza."""
+    """Register a new piece type. Returns new id or None."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -107,14 +139,14 @@ def crear_tipo_pieza(nombre, descripcion, defectos, empresa_id=None):
             nombre, descripcion,
             json.dumps(defectos if isinstance(defectos, list) else []),
             empresa_id,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         ))
         id_nuevo = cur.fetchone()[0]
         conn.commit()
         return id_nuevo
-    except Exception as e:
+    except Exception as exc:
         conn.rollback()
-        print(f"Error creando tipo pieza: {e}")
+        logger.error("Error creating piece type: %s", exc)
         return None
     finally:
         cur.close()
@@ -122,7 +154,7 @@ def crear_tipo_pieza(nombre, descripcion, defectos, empresa_id=None):
 
 
 def obtener_defectos_tipo(nombre_tipo, empresa_id=None):
-    """Devuelve la lista de defectos conocidos para un tipo de pieza."""
+    """Return the known defect list for a piece type name."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -154,7 +186,7 @@ def obtener_defectos_tipo(nombre_tipo, empresa_id=None):
 
 def registrar_analisis(empresa_id, tipo_pieza, resultado, confianza,
                        defecto, zona, accion, resumen, num_imagenes=1):
-    """Guarda un análisis en la base de datos. Devuelve el ID."""
+    """Save an analysis to the database. Returns the new id."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -167,14 +199,14 @@ def registrar_analisis(empresa_id, tipo_pieza, resultado, confianza,
         """, (
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             empresa_id, tipo_pieza, resultado, confianza,
-            defecto, zona, accion, resumen, num_imagenes
+            defecto, zona, accion, resumen, num_imagenes,
         ))
         id_nuevo = cur.fetchone()[0]
         conn.commit()
         return id_nuevo
-    except Exception as e:
+    except Exception as exc:
         conn.rollback()
-        print(f"Error registrando análisis: {e}")
+        logger.error("Error registering analysis: %s", exc)
         return None
     finally:
         cur.close()
@@ -182,7 +214,7 @@ def registrar_analisis(empresa_id, tipo_pieza, resultado, confianza,
 
 
 def obtener_historial_iqi(empresa_id=None, limite=50):
-    """Devuelve el historial de análisis. None = todos (admin)."""
+    """Return analysis history. empresa_id=None returns all (admin only)."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -190,7 +222,7 @@ def obtener_historial_iqi(empresa_id=None, limite=50):
             cur.execute("""
                 SELECT a.id, a.timestamp, a.tipo_pieza, a.resultado,
                        a.confianza, a.defecto, a.accion, a.num_imagenes,
-                       e.nombre as empresa
+                       e.nombre AS empresa
                 FROM analisis_iqi a
                 LEFT JOIN empresas e ON a.empresa_id = e.id
                 ORDER BY a.id DESC LIMIT %s
@@ -199,15 +231,15 @@ def obtener_historial_iqi(empresa_id=None, limite=50):
             cur.execute("""
                 SELECT a.id, a.timestamp, a.tipo_pieza, a.resultado,
                        a.confianza, a.defecto, a.accion, a.num_imagenes,
-                       e.nombre as empresa
+                       e.nombre AS empresa
                 FROM analisis_iqi a
                 LEFT JOIN empresas e ON a.empresa_id = e.id
                 WHERE a.empresa_id = %s
                 ORDER BY a.id DESC LIMIT %s
             """, (empresa_id, limite))
         return cur.fetchall()
-    except Exception as e:
-        print(f"Error obteniendo historial: {e}")
+    except Exception as exc:
+        logger.error("Error fetching history: %s", exc)
         return []
     finally:
         cur.close()
@@ -218,7 +250,7 @@ def obtener_historial_iqi(empresa_id=None, limite=50):
 
 def registrar_verificacion(analisis_id, resultado_ia, resultado_operario,
                            empresa_id, usuario_nombre=""):
-    """Guarda la verificación del operario sobre un análisis."""
+    """Save an operator verification for an analysis."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -232,13 +264,13 @@ def registrar_verificacion(analisis_id, resultado_ia, resultado_operario,
             analisis_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             resultado_ia, resultado_operario,
-            concordancia, empresa_id, usuario_nombre
+            concordancia, empresa_id, usuario_nombre,
         ))
         conn.commit()
         return True
-    except Exception as e:
+    except Exception as exc:
         conn.rollback()
-        print(f"Error registrando verificación: {e}")
+        logger.error("Error registering verification: %s", exc)
         return False
     finally:
         cur.close()
@@ -248,75 +280,104 @@ def registrar_verificacion(analisis_id, resultado_ia, resultado_operario,
 # ─── ESTADÍSTICAS ─────────────────────────────────────────────────────────────
 
 def obtener_stats_iqi(empresa_id=None):
-    """Devuelve estadísticas del sistema IQI."""
+    """
+    Return IQI statistics for a company.
+    empresa_id=None returns global stats (admin).
+
+    Security: all queries use parameterised placeholders — no f-string SQL.
+    """
     conn = get_conn()
     cur = conn.cursor()
     try:
-        filtro = "WHERE empresa_id = %s" if empresa_id else ""
-        params = (empresa_id,) if empresa_id else ()
-
-        cur.execute(f"""
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN resultado = 'OK' THEN 1 ELSE 0 END) as ok,
-                SUM(CASE WHEN resultado = 'REVISAR' THEN 1 ELSE 0 END) as revisar,
-                SUM(CASE WHEN resultado = 'NOK' THEN 1 ELSE 0 END) as nok,
-                ROUND(AVG(confianza)) as confianza_media
-            FROM analisis_iqi {filtro}
-        """, params)
+        # ── Totals per result ────────────────────────────────────────────────
+        if empresa_id is not None:
+            cur.execute("""
+                SELECT
+                    COUNT(*)                                                   AS total,
+                    SUM(CASE WHEN resultado = 'OK'      THEN 1 ELSE 0 END)   AS ok,
+                    SUM(CASE WHEN resultado = 'REVISAR' THEN 1 ELSE 0 END)   AS revisar,
+                    SUM(CASE WHEN resultado = 'NOK'     THEN 1 ELSE 0 END)   AS nok,
+                    ROUND(AVG(confianza))                                     AS confianza_media
+                FROM analisis_iqi
+                WHERE empresa_id = %s
+            """, (empresa_id,))
+        else:
+            cur.execute("""
+                SELECT
+                    COUNT(*)                                                   AS total,
+                    SUM(CASE WHEN resultado = 'OK'      THEN 1 ELSE 0 END)   AS ok,
+                    SUM(CASE WHEN resultado = 'REVISAR' THEN 1 ELSE 0 END)   AS revisar,
+                    SUM(CASE WHEN resultado = 'NOK'     THEN 1 ELSE 0 END)   AS nok,
+                    ROUND(AVG(confianza))                                     AS confianza_media
+                FROM analisis_iqi
+            """)
         fila = cur.fetchone()
-        total, ok, revisar, nok, confianza_media = fila if fila else (
-            0, 0, 0, 0, 0)
+        total, ok, revisar, nok, confianza_media = fila if fila else (0, 0, 0, 0, 0)
 
-        cur.execute(f"""
-            SELECT COUNT(*) FROM verificaciones_iqi {filtro}
-        """, params)
+        # ── Verification count ────────────────────────────────────────────────
+        if empresa_id is not None:
+            cur.execute(
+                "SELECT COUNT(*) FROM verificaciones_iqi WHERE empresa_id = %s",
+                (empresa_id,),
+            )
+        else:
+            cur.execute("SELECT COUNT(*) FROM verificaciones_iqi")
         verificaciones = cur.fetchone()[0] or 0
 
-        cur.execute(f"""
-            SELECT COUNT(*) FROM verificaciones_iqi
-            {'WHERE empresa_id = %s AND' if empresa_id else 'WHERE'} concordancia = TRUE
-        """, params)
+        # ── Concordance count ─────────────────────────────────────────────────
+        if empresa_id is not None:
+            cur.execute("""
+                SELECT COUNT(*) FROM verificaciones_iqi
+                WHERE empresa_id = %s AND concordancia = TRUE
+            """, (empresa_id,))
+        else:
+            cur.execute("""
+                SELECT COUNT(*) FROM verificaciones_iqi
+                WHERE concordancia = TRUE
+            """)
         concordancias = cur.fetchone()[0] or 0
 
         return {
-            "total_analisis": total or 0,
-            "ok": ok or 0,
-            "revisar": revisar or 0,
-            "nok": nok or 0,
-            "confianza_media": int(confianza_media) if confianza_media else 0,
-            "verificaciones": verificaciones,
-            "tasa_concordancia": round(concordancias / verificaciones * 100, 1) if verificaciones > 0 else 0
+            "total_analisis":    total or 0,
+            "ok":                ok or 0,
+            "revisar":           revisar or 0,
+            "nok":               nok or 0,
+            "confianza_media":   int(confianza_media) if confianza_media else 0,
+            "verificaciones":    verificaciones,
+            "tasa_concordancia": round(concordancias / verificaciones * 100, 1)
+                                 if verificaciones > 0 else 0,
         }
-    except Exception as e:
-        print(f"Error obteniendo stats: {e}")
-        return {"total_analisis": 0, "ok": 0, "revisar": 0, "nok": 0,
-                "confianza_media": 0, "verificaciones": 0, "tasa_concordancia": 0}
+    except Exception as exc:
+        logger.error("Error fetching stats: %s", exc)
+        return {
+            "total_analisis": 0, "ok": 0, "revisar": 0, "nok": 0,
+            "confianza_media": 0, "verificaciones": 0, "tasa_concordancia": 0,
+        }
     finally:
         cur.close()
         conn.close()
 
-# ─── USUARIOS (compartido con AuraPredict) ───────────────────────────────────
 
+# ─── USUARIOS (shared with AuraPredict) ──────────────────────────────────────
 
 def obtener_usuario_por_email(email):
-    """Obtiene los datos de un usuario para login."""
+    """Fetch user data by email for login."""
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute(
             "SELECT id, email, password_hash, nombre, rol, empresa_id, activo "
             "FROM usuarios WHERE email = %s",
-            (email,)
+            (email,),
         )
         return cur.fetchone()
-    except Exception as e:
-        print(f"Error obteniendo usuario: {e}")
+    except Exception as exc:
+        logger.error("Error fetching user: %s", exc)
         return None
     finally:
         cur.close()
         conn.close()
 
 
-# ─── AUTOEJECUCIÓN ────────────────────────────────────────────────────────────
-init_iqi_db()
+# ─── NOTA: init_iqi_db() ya NO se llama aquí automáticamente. ────────────────
+# Se llama desde el lifespan de FastAPI en api_iqi.py.

@@ -1,0 +1,35 @@
+# ─── Entornos virtuales ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ─── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ─── Variables de entorno (contienen secretos) ────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+
+# ─── Modelos YOLO (binarios pesados — no pertenecen a git) ───────────────────
+# best_aluminio.pt está en el repo temporalmente.
+# Estrategia pendiente: git-lfs o Supabase Storage.
+*.pt
+# Excepto si quieres mantener el trained model en git:
+# !best_aluminio.pt
+
+# ─── Artefactos de entrenamiento ──────────────────────────────────────────────
+scripts/legacy_yolo/runs/
+runs/
+
+# ─── Datos / datasets ─────────────────────────────────────────────────────────
+datasets/
+raw_data/

@@ -1,78 +1,147 @@
-# 🛡️ Industrial Quality Inspector AI (CV + FastAPI + Docker)
+# 🔍 IQI Aluminium — Industrial Quality Inspector
 
-Este proyecto es un sistema de **Visión Artificial end-to-end** para el control de calidad en entornos de Industria 4.0. Utiliza Deep Learning para detectar defectos en superficies de acero y expone la inteligencia a través de una API REST.
+Sistema de inspección visual de calidad industrial para operarios a pie de máquina.
 
-Todo el entorno está contenerizado con **Docker**, asegurando un despliegue ligero (CPU-only) y reproducible en cualquier servidor de planta.
+**Flujo:** El operario fotografía una pieza → la IA analiza → devuelve OK / REVISAR / NOK → el operario puede validar o corregir → todo queda registrado para trazabilidad.
 
-![Logo del Proyecto](assets/logo_IndustrialQI.png)
+![Logo IQI](assets/logo_IQI_trans.png)
 
-## 🏗️ Arquitectura
+---
 
-El sistema consta de un flujo de trabajo optimizado para inferencia en producción:
+## Arquitectura
 
-1.  **AI Core (YOLOv8):**
-    - Modelo de clasificación entrenado mediante _Transfer Learning_ sobre el dataset industrial **NEU-CLS**.
-    - Capaz de diferenciar entre 6 tipos de defectos críticos (Scratches, Patches, Inclusions, etc.) con alta precisión.
-2.  **API Service (FastAPI):**
-    - Interfaz REST de alto rendimiento que recibe imágenes de superficies metálicas.
-    - Procesa la imagen, ejecuta la inferencia en el modelo y devuelve una decisión de negocio en formato JSON (Tipo de defecto, Confianza % y Acción requerida: OK/NOK).
-    - Incluye documentación interactiva automática (Swagger UI).
-3.  **Contenedorización (Docker):**
-    - Empaquetado en una imagen Linux ligera (basada en Python Slim).
-    - Optimizado para ejecutarse sin necesidad de GPU dedicada, utilizando versiones ligeras de PyTorch y herramientas headless.
-
-## 🚀 Tecnologías
-
-- **Lenguaje:** Python 3.10
-- **IA / Computer Vision:** Ultralytics YOLOv8, PyTorch (CPU), OpenCV-headless
-- **Backend:** FastAPI, Uvicorn
-- **Contenedores:** Docker
-
-## 🛠️ Instalación y Uso
-
-### Prerrequisitos
-
-- Tener [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y corriendo.
-
-### Pasos
-
-1.  Clonar el repositorio:
-
-    ```bash
-    git clone https://github.com/javaqber/industrial-quality-inspector.git
-    cd industrial_quality_inspector
-    ```
-
-2.  Construir la imagen Docker:
-
-    ```bash
-    docker build -t inspector-calidad .
-    ```
-
-3.  Arrancar el servicio:
-
-    ```bash
-    docker run -p 8000:8000 inspector-calidad
-    ```
-
-4.  Acceder a la API y probarla:
-    - Abre tu navegador en: `http://localhost:8501/docs`
-    - Usa el endpoint `POST /predict` para subir una imagen de prueba y ver el resultado del análisis.
-
-5.  Detener el sistema:
-    - Pulsa `Ctrl + C` en la terminal.
-
-## 📊 Previsualización del Flujo
-
-El sistema está diseñado para recibir una imagen cruda y devolver una decisión accionable en milisegundos.
-
-**Output (Respuesta JSON de la API):**
-
-```json
-{
-  "filename": "pieza_test_01.jpg",
-  "defect_type": "Scratches",
-  "confidence": "99.8%",
-  "action_required": "DESCARTAR PIEZA"
-}
 ```
+Móvil (PWA — static/index.html)
+        ↓ HTTPS
+FastAPI (src/api_iqi.py)
+        ↓ Anthropic SDK
+Claude Vision AI (claude-sonnet-4-6)
+        ↓
+PostgreSQL (Supabase — compartido con AuraPredict)
+```
+
+## Stack técnico
+
+| Componente | Tecnología |
+|---|---|
+| Backend | FastAPI + Uvicorn (Python 3.12) |
+| IA | Claude Vision (Anthropic claude-sonnet-4-6) |
+| Frontend | PWA single-file (`static/index.html`) |
+| Base de datos | PostgreSQL via psycopg2 |
+| Auth | JWT (python-jose + bcrypt) |
+| Deploy | Docker |
+
+## Estructura del proyecto
+
+```
+iqi/
+├── src/
+│   ├── api_iqi.py        ← API principal (FastAPI)
+│   ├── auth.py           ← JWT auth
+│   └── database_iqi.py   ← Capa PostgreSQL
+├── static/
+│   └── index.html        ← PWA móvil (autocontenida)
+├── assets/               ← Logos
+├── scripts/
+│   └── legacy_yolo/      ← Implementación YOLO original (archivada)
+├── Dockerfile
+├── requirements.txt
+└── .env.example          ← Variables de entorno necesarias
+```
+
+## Variables de entorno
+
+Crea un archivo `.env` en la raíz:
+
+```env
+# PostgreSQL (compartida con AuraPredict)
+DATABASE_URL=postgresql://usuario:password@host:5432/database
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+
+# JWT
+SECRET_KEY=clave_secreta_larga_y_aleatoria
+
+# CORS (orígenes permitidos separados por coma)
+CORS_ORIGINS=http://localhost:8000,https://tudominio.com
+
+# Límite de tamaño de imagen (bytes, default 10MB)
+MAX_IMAGE_BYTES=10485760
+```
+
+## Arranque local
+
+```bash
+# 1. Instalar dependencias
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 2. Configurar entorno
+cp .env.example .env
+# Editar .env con tus valores reales
+
+# 3. Arrancar API
+uvicorn src.api_iqi:app --reload --port 8000
+
+# 4. Acceder a la PWA
+# http://localhost:8000/app
+# Documentación: http://localhost:8000/docs
+```
+
+## Arranque con Docker
+
+```bash
+# Construir imagen
+docker build -t iqi-aluminium .
+
+# Arrancar contenedor
+docker run -p 8000:8000 --env-file .env iqi-aluminium
+
+# Acceder
+# PWA:  http://localhost:8000/app
+# Docs: http://localhost:8000/docs
+```
+
+## Endpoints principales
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | `/login` | Login → JWT |
+| POST | `/iqi/analyze` | Analizar imagen(es) con IA |
+| POST | `/iqi/verify` | Verificar/corregir resultado |
+| GET | `/iqi/history` | Historial de análisis |
+| GET | `/iqi/stats` | Estadísticas por empresa |
+| GET | `/iqi/tipos` | Tipos de pieza configurados |
+| POST | `/iqi/tipos` | Crear tipo de pieza |
+
+## Tablas de base de datos
+
+IQI utiliza la misma instancia PostgreSQL que AuraPredict.
+
+**Compartidas:**
+- `empresas` — clientes/tenants
+- `usuarios` — usuarios con roles
+
+**Específicas de IQI:**
+- `tipos_pieza_iqi` — tipos de pieza configurados por empresa
+- `analisis_iqi` — registro de cada inspección
+- `verificaciones_iqi` — correcciones del operario (futuro ground truth para ML)
+
+## Implementación YOLO (archivada)
+
+La implementación original basada en YOLOv8 está conservada en `scripts/legacy_yolo/`.
+No se usa en producción. Ver `scripts/legacy_yolo/README.md` para más información.
+
+El modelo entrenado `best_aluminio.pt` se conserva como base para integración futura
+como fallback offline o punto de partida para modelos supervisados.
+
+## Roadmap pendiente
+
+- [ ] Almacenamiento de imágenes en Supabase Storage (trazabilidad completa)
+- [ ] Migración de timestamps TEXT → TIMESTAMPTZ
+- [ ] Token de refresco automático
+- [ ] Tipos de pieza dinámicos en la PWA (carga desde `/iqi/tipos`)
+- [ ] Rate limiting por empresa en `/iqi/analyze`
+- [ ] PWA manifest.json (instalable en móvil)
